@@ -925,6 +925,7 @@ class Operator:
                                 if( abs(data[8]) > 1.e-16 ): self.set_2bme_from_indices(ni,pj,nk,nl,Jij,Jkl,data[8])
                                 if( abs(data[9]) > 1.e-16 ): self.set_2bme_from_indices(ni,nj,nk,nl,Jij,Jkl,data[9])
         f.close()
+    
     def _read_3b_operator_readabletxt(self, filename, comment="!"):
         if( self.ms == None ):
             ms = ModelSpace(rank=3)
@@ -946,6 +947,7 @@ class Operator:
             if(abs(ME) > 1.e-6): self.set_3bme_from_indices(i,j,k,Jij,Tij,l,m,n,Jlm,Tlm,Jbra,Tbra,Jket,Tket,ME)
             line = f.readline()
         f.close()
+    
     def _read_general_operator_navratil(self, filename, comment="!"):
         emax=16
         ms = ModelSpace()
@@ -1338,6 +1340,7 @@ class Operator:
                     line += "{:3d} {:3d} {:3d} {:3d}".format(chbra.J, chbra.T, chket.J, chket.T)
                     line += "{:12.6f}".format(ME)
                     print(line)
+    
     def embed_one_to_two(self,A=2):
         two = self.ms.two
         orbits = self.ms.orbits
@@ -1469,6 +1472,7 @@ class Operator:
         if(a==b): me /= np.sqrt(2.0)
         if(c==d): me /= np.sqrt(2.0)
         return me
+    
     def spin_tensor_decomposition(self, chan_J=None):
         if(self.rankJ != 0):
             print("Spin-tensor decomposition is not defined for a non-scalar operator")
@@ -1635,7 +1639,7 @@ class Operator:
             i2 = orbs.get_orbit_index(n2, l2, j2d, tz2d)
             i3 = orbs.get_orbit_index(n3, l3, j3d, tz3d)
             i4 = orbs.get_orbit_index(n4, l4, j4d, tz4d)
-#            print(i1,i2,i3,i4,m1d,m2d,m3d,m4d,self.get_2bme_Mscheme(i1, m1d, i2, m2d, i3, m3d, i4, m4d, mud),coef)
+        #     print(i1,i2,i3,i4,m1d,m2d,m3d,m4d,self.get_2bme_Mscheme(i1, m1d, i2, m2d, i3, m3d, i4, m4d, mud),coef)
             me += self.get_2bme_Mscheme(i1, m1d, i2, m2d, i3, m3d, i4, m4d, mud) * coef
         return me
 
@@ -1820,7 +1824,6 @@ class Operator:
                 me = np.sqrt(6*(op.j+1)*(oq.j+1)) * (-1)**((op.j+3)//2 + op.l) * float(wigner_6j(0.5, 0.5, 1, 0.5*oq.j, 0.5*op.j, op.l))
                 self.set_1bme(p,q,me)
         self.reduced=True
-
 
     def set_fermi_op(self):
         """
@@ -2189,8 +2192,10 @@ class Operator:
                     c, d = chket.get_indices(iket)
                     me = _me(a, b, c, d, chbra.J, chket.J)
                     self.set_2bme_from_indices(a, b, c, d, chbra.J, chket.J, me)
+
     def set_density_at_r(self, r, iso=0):
         pass
+
     def set_kinetic_density_at_r(self, r, iso=0):
         pass
     def set_spin_orbit_density_at_r(self, r, iso=0):

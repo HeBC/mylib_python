@@ -37,6 +37,7 @@ class Orbits:
         self.verbose=verbose
         if( emax == None and lmax==None and shell_model_space==None): return
         self.set_orbits(emax=emax,lmax=lmax,shell_model_space=shell_model_space)
+
     def add_orbit(self,*nljz):
         if(nljz in self.nljz_idx):
             if(self.verbose): print("The orbit ({:3d},{:3d},{:3d},{:3d}) is already there.".format(*nljz) )
@@ -49,8 +50,10 @@ class Orbits:
         self.orbits.append( orb )
         self.emax = max(self.emax, 2*nljz[0]+nljz[1])
         self.lmax = max(self.lmax, nljz[1])
+
     def get_orbit_label(self, idx):
         return get_orbit_label_from_orbit(self.get_orbit(idx))
+
     def get_orbit_label_from_orbit(self, o):
         if(o.z==-1): return f'p{o.n}{self._labels_orbital_angular_momentum[o.l]}{o.j}/2'
         if(o.z== 1): return f'n{o.n}{self._labels_orbital_angular_momentum[o.l]}{o.j}/2'
@@ -77,24 +80,32 @@ class Orbits:
             l += 1
         j = int(j_str)
         self.add_orbit(n,l,j,z)
+
     def add_orbits_from_labels(self,*strings):
         for label in strings:
             self.add_orbit_from_label(label)
+
     def get_orbit(self,idx):
         return self.orbits[idx-1]
+
     def get_orbit_label(self,idx):
         o = self.get_orbit(idx)
         pn = "p"
         if(o.z==1): pn="n"
         return pn+str(o.n)+self._labels_orbital_angular_momentum[o.l]+str(o.j)
+
     def get_orbit_index(self,*nljz):
         return self.nljz_idx[nljz]
+
     def get_orbit_index_from_orbit(self,o):
         return self.get_orbit_index(o.n,o.l,o.j,o.z)
+
     def get_orbit_index_from_tuple(self,nljz):
         return self.nljz_idx[nljz]
+    
     def get_num_orbits(self):
         return self.norbs
+    
     def set_orbits(self, emax=None, lmax=None, shell_model_space=None, order_pn=False):
         if(order_pn):
             if( emax != None):
@@ -125,14 +136,17 @@ class Orbits:
                 self.add_orbits_from_labels( "p0d5","p1s1","p0d3","n0d5","n1s1","n0d3" )
             if( shell_model_space == "pf-shell" ):
                 self.add_orbits_from_labels( "p0f7","p1p3","p1p1","p0f5","n0f7","n1p3","n1p1","n0f5" )
+
     def is_same_orbit(self, oi, oj):
         if(oi.n != oj.n): return False
         if(oi.l != oj.l): return False
         if(oi.j != oj.j): return False
         if(oi.z != oj.z): return False
         return True
+
     def __str__(self):
         return self.print_orbits()
+
     def print_orbits(self):
         string = "Orbits list:\n"
         string += "idx,  n,  l,  j,  z,  e\n"

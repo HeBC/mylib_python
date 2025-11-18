@@ -14,23 +14,24 @@ def Rp2_to_Rch2( Rp2, Z, N, fs_corrections=None):
         mean squared charge radii
     """
     if(fs_corrections==None):
-#        rcp2 = 0.8783**2 # CODATA
-#        rcn2 = -0.115    # CODATA
-#        rcp2 = 0.709     # Nature 466, 213 (2010).
-#        rcn2 = -0.106    # Phys. Rev. Lett. 124, 082501
+    #        rcp2 = 0.8783**2 # CODATA
+    #        rcn2 = -0.115    # CODATA
+    #        rcp2 = 0.709     # Nature 466, 213 (2010).
+    #        rcn2 = -0.106    # Phys. Rev. Lett. 124, 082501
         rcp2 = 0.8409**2 # PDG 2024 
-        rcn2 = -0.1155 # PDG 2024
+        rcn2 = -0.1155   # PDG 2024
     else:
         rcp2, rcn2 = fs_corrections   
 
-    DF = 0.033
+    DF = 0.033 # relativistic (Darwin–Foldy)
     return Rp2 + rcp2 + N/Z * rcn2 + DF
+
 def Rch2_to_Rp2( Rch2, Z, N, fs_corrections=None):
     if(fs_corrections==None):
-#        rcp2 = 0.8783**2 # CODATA
-#        rcn2 = -0.115    # CODATA
-#        rcp2 = 0.709     # Nature 466, 213 (2010).
-#        rcn2 = -0.106    # Phys. Rev. Lett. 124, 082501
+    #        rcp2 = 0.8783**2 # CODATA
+    #        rcn2 = -0.115    # CODATA
+    #        rcp2 = 0.709     # Nature 466, 213 (2010).
+    #        rcn2 = -0.106    # Phys. Rev. Lett. 124, 082501
         rcp2 = 0.8409**2 # PDG 2024 
         rcn2 = -0.1155 # PDG 2024
     else:
@@ -79,6 +80,7 @@ def ME_to_inverse_half_life( ME, Jinit, lam, Ediff, EM ):
 
 def RME_to_ME( RME, Jbra, lam, Jket, Mbra, mu, Mket):
     return RME * (-1)**(Jbra-Mbra) * N(wigner_3j(Jbra,lam,Jket,-Mbra,mu,Mket))
+
 def ME_to_RME( ME, Jbra, lam, Jket, Mbra, mu, Mket):
     return ME / (-1)**(Jbra-Mbra) * N(wigner_3j(Jbra,lam,Jket,-Mbra,mu,Mket))
 
@@ -102,6 +104,7 @@ def mu_sp(l,j,tz,gs=None,gl=None):
     else:
         print("Error: j has to be l-1/2 or l+1/2")
         return None
+
 def Q_sp(j,A):
     """
     inputs:

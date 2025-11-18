@@ -8,9 +8,11 @@ from sympy.physics.quantum.cg import CG
 import functools
 if(__package__==None or __package__==""):
     import ModelSpace
+    from .DensityRho import Density_CoordinateSpace
 else:
     from . import Orbits
     from . import ModelSpace
+    from .DensityRho import Density_CoordinateSpace
 
 @functools.lru_cache(maxsize=None)
 def _sixj(j1, j2, j3, j4, j5, j6):
@@ -24,7 +26,7 @@ def _clebsch_gordan(j1, j2, j3, m1, m2, m3):
 
 
 class TransitionDensity:
-    def __init__(self, Jbra=None, Jket=None, wflabel_bra=None, wflabel_ket=None, ms=None, filename=None, file_format="kshell", verbose=False):
+    def __init__(self, Rho_r: Density_CoordinateSpace, Jbra=None, Jket=None, wflabel_bra=None, wflabel_ket=None, ms=None, filename=None, file_format="kshell", verbose=False):
         self.Jbra = Jbra
         self.Jket = Jket
         self.wflabel_bra = wflabel_bra
@@ -35,6 +37,7 @@ class TransitionDensity:
         self.one = {}
         self.two = {}
         self.three = {}
+        self.Rho_r = Rho_r
         if( ms != None ): self.allocate_density( ms )
         if( filename != None ): self.read_density_file( filename, file_format )
 
@@ -122,8 +125,10 @@ class TransitionDensity:
             for ichket in range(three.get_number_channels()):
                 chket = three.get_channel(ichket)
                 self.three[(ichbra,ichket)] = {}
+
     def count_nonzero_1btd(self):
         return len(self.one)
+
     def count_nonzero_2btd(self):
         counter = 0
         two = self.ms.two
@@ -134,12 +139,15 @@ class TransitionDensity:
                 chket = two.get_channel(j)
                 counter += len( self.two[(i,j)] )
         return counter
+
     def set_1btd( self, a, b, jrank, me):
         if(abs(me) < 1.e-16): return
         self.one[(a,b,jrank)] = me
+
     def set_2btd_from_mat_indices( self, chbra, chket, bra, ket, jrank, me ):
         if(abs(me) < 1.e-16): return
         self.two[(chbra,chket)][(bra,ket,jrank)] = me
+
     def set_2btd_from_indices( self, a, b, c, d, Jab, Jcd, jrank, me ):
         two = self.ms.two
         orbits = two.orbits
@@ -160,6 +168,7 @@ class TransitionDensity:
         ket = chket.index_from_indices[(c,d)]
         phase = chbra.phase_from_indices[(a,b)] * chket.phase_from_indices[(c,d)]
         self.set_2btd_from_mat_indices(ichbra,ichket,bra,ket,jrank,me*phase)
+
     def set_2btd_from_orbits( self, oa, ob, oc, od, Jab, Jcd, jrank, me ):
         orbits = self.ms.orbits
         a = orbits.orbit_index_from_orbit( oa )
@@ -173,6 +182,7 @@ class TransitionDensity:
             return self.one[args]
         except:
             return 0
+
     def get_1btd_Mscheme(self, p, mp2, q, mq2, Mbra, Mket, scalar=False):
         orbs = self.ms.orbits
         op = orbs.get_orbit(p)
@@ -192,6 +202,7 @@ class TransitionDensity:
         except:
             #if(self.verbose): print("Nothing here " + sys._getframe().f_code.co_name )
             return 0
+
     def get_2btd_from_indices( self, a, b, c, d, Jab, Jcd, jrank ):
         if(self.ms.rank <= 1): return 0
         two = self.ms.two
@@ -223,6 +234,7 @@ class TransitionDensity:
             return 0
         phase = chbra.phase_from_indices[(a,b)] * chket.phase_from_indices[(c,d)]
         return self.get_2btd_from_mat_indices(ichbra,ichket,bra,ket,jrank)*phase
+
     def get_2btd_from_orbits( self, oa, ob, oc, od, Jab, Jcd, jrank ):
         if(self.ms.rank <= 1): return 0
         orbits = self.ms.orbits
@@ -306,6 +318,7 @@ class TransitionDensity:
         b = True
         if(abs(J1-J2) <= J3 <= J1+J2): b = False
         return b
+
     def read_density_file(self, filename=None, file_format="kshell"):
         if(filename == None):
             print(" set file name!")
@@ -339,6 +352,7 @@ class TransitionDensity:
             if(line[0] != comment):
                 f.seek(x)
                 return
+
     def _read_td_kshell_format(self, filename):
         if(not os.path.exists(filename)):
             print("file is not found {}".format(filename))
@@ -709,8 +723,10 @@ class TransitionDensity:
 
     def eval_expectation_value( self, op, J1=None, J2=None, pn=None ):
         return self.calc_expectation_value( op, J1, J2, pn )
+
     def eval( self, op, J1=None, J2=None, pn=None ):
         return self.calc_expectation_value( op, J1, J2, pn )
+
     def calc_expectation_value( self, op, J1=None, J2=None, pn=None ):
         orbits_de = self.ms.orbits
         orbits_op = op.ms.orbits
@@ -778,185 +794,95 @@ class TransitionDensity:
                     #    print("{:3d},{:3d},{:3d},{:3d},{:3d},{:3d},{:16.10f},{:16.10f}".format(i,j,k,l,Jij,Jkl,op.get_2bme_from_indices(i,j,k,l,Jij,Jkl),\
                     #        self.get_2btd_from_indices(i_d,j_d,k_d,l_d,Jij,Jkl,op.rankJ)))
         return zero,one,two
-#    def eval_NME_non_closure(self, that, op):
-#        """
-#        NME(K) = sum_{i<=j:proton} sum_{k<=l:neutron} (ij|Op|kl) (Jf|ci^t ck|K) (K|cj^t cl|Ji)
-#        self => (Jf|c^t c|K)
-#        that => (K|c^t c|Ji)
-#        """
-#        orbits_de = self.ms.orbits
-#        orbits_op = op.ms.orbits
-#        norbs = orbits_op.get_num_orbits()
-#        res = 0
-#        if(self.Jket != that.Jbra): raise ValueError()
-#        Jf = self.Jbra
-#        K = self.Jket
-#        Ji = that.Jket
-#        #ijlist = list(itertools.combinations_with_replacement(list(range(1,norbs+1)),2))
-#        ijlist = list(itertools.product(list(range(1,norbs+1)),repeat=2))
-#        for ij, kl in itertools.product(ijlist, repeat=2):
-#            i, j = ij
-#            k, l = kl
-#            norm = 1
-#            if(i==j): norm *= np.sqrt(2)
-#            if(k==l): norm *= np.sqrt(2)
-#            oi = orbits_op.get_orbit(i)
-#            oj = orbits_op.get_orbit(j)
-#            ok = orbits_op.get_orbit(k)
-#            ol = orbits_op.get_orbit(l)
-#
-#            i_d = orbits_de.get_orbit_index(oi.n, oi.l, oi.j, oi.z)
-#            j_d = orbits_de.get_orbit_index(oj.n, oj.l, oj.j, oj.z)
-#            k_d = orbits_de.get_orbit_index(ok.n, ok.l, ok.j, ok.z)
-#            l_d = orbits_de.get_orbit_index(ol.n, ol.l, ol.j, ol.z)
-#            if((-1)**(oi.l+oj.l+ok.l+ol.l) * op.rankP != 1): continue
-#            if( abs(oi.z+oj.z-ok.z-ol.z) != 4): continue
-#            Jijlist = list(range( int(abs(oi.j-oj.j)/2), int((oi.j+oj.j)/2)+1))
-#            Jkllist = list(range( int(abs(ok.j-ol.j)/2), int((ok.j+ol.j)/2)+1))
-#            Jiklist = list(range( int(abs(oi.j-ok.j)/2), int((oi.j+ok.j)/2)+1))
-#            Jjllist = list(range( int(abs(oj.j-ol.j)/2), int((oj.j+ol.j)/2)+1))
-#            for Jij, Jkl in itertools.product(Jijlist, Jkllist):
-#                if(i == j and Jij%2 == 1): continue
-#                if(k == l and Jkl%2 == 1): continue
-#                if( self._triag( Jij, Jkl, op.rankJ )): continue
-#                for Jik, Jjl in itertools.product(Jiklist, Jjllist):
-#                    if( self._triag( Jik, Jjl, op.rankJ )): continue
-#                    #res += float(wigner_9j(0.5*oi.j, 0.5*oj.j, Jij, 0.5*ok.j, 0.5*ol.j, Jkl, Jik, Jjl, op.rankJ)) * \
-#                    #        float(wigner_6j(Jik, Jjl, op.rankJ, Ji, Jf, K)) * \
-#                    #        np.sqrt((2*Jij+1)*(2*Jkl+1)/(2*op.rankJ+1))*(2*Jik+1)*(2*Jjl+1) * (-1)**(Ji+Jf+op.rankJ) * \
-#                    #        op.get_2bme_from_indices(i,j,k,l,Jij,Jkl) * \
-#                    #        self.get_1btd(i_d,k_d,Jik) * that.get_1btd(j_d,l_d,Jjl) * norm * 0.25
-#                    res += float(_ninej(0.5*oi.j, 0.5*oj.j, Jij, 0.5*ok.j, 0.5*ol.j, Jkl, Jik, Jjl, op.rankJ)) * \
-#                            float(_sixj(Jik, Jjl, op.rankJ, Ji, Jf, K)) * \
-#                            np.sqrt((2*Jij+1)*(2*Jkl+1)/(2*op.rankJ+1))*(2*Jik+1)*(2*Jjl+1) * (-1)**(Ji+Jf+op.rankJ) * \
-#                            op.get_2bme_from_indices(i,j,k,l,Jij,Jkl) * \
-#                            self.get_1btd(i_d,k_d,Jik) * that.get_1btd(j_d,l_d,Jjl) * norm * 0.25
-#        return res
 
-    def to_DataFrame(self, rank=None):
-        if(rank==1 or rank==None):
-            orbits = self.ms.orbits
-            tmp = []
-            for idx in self.one.keys():
-                tmp.append({"a":idx[0],"b":idx[1],"rank":idx[2],"1 body":self.one[idx]})
-            if(len(tmp)==0):
-                one = pd.DataFrame()
-            else:
-                one = pd.DataFrame(tmp)
-                one = one.iloc[list(~one["1 body"].eq(0)),:].reset_index(drop=True)
-        if(rank==2 or rank==None):
-            tmp = []
-            for channels in self.two.keys():
-                chbra = self.ms.two.get_channel(channels[0])
-                chket = self.ms.two.get_channel(channels[1])
-                Jab = chbra.J
-                Jcd = chket.J
-                for idx in self.two[channels].keys():
-                    a, b = chbra.get_indices(idx[0])
-                    c, d = chket.get_indices(idx[1])
-                    tmp.append({"a":a, "b":b, "c":c, "d":d, "Jab":Jab, "Jcd":Jcd, "rank":idx[2],"2 body":self.two[channels][idx]})
-            if(len(tmp)==0):
-                two = pd.DataFrame()
-            else:
-                two = pd.DataFrame(tmp)
-                two = two.iloc[list(~two["2 body"].eq(0)),:].reset_index(drop=True)
-        if(rank==1): return one
-        if(rank==2): return two
-        if(rank==None): return one, two
+    def eval_density_r( self, op, J1=None, J2=None, pn=None ):
+        return self.calc_expectation_value_r_space( op, J1, J2, pn )
 
-    def compare_transition_densities(self, op, ax):
-        orbs = self.ms.orbits
-        norbs = orbs.get_num_orbits()
-        x, y = [], []
+    def calc_expectation_value_r_space( self, op, J1=None, J2=None, pn=None ):
+        orbits_de = self.ms.orbits
+        orbits_op = op.ms.orbits
+        norbs = orbits_op.get_num_orbits()
+        if(pn!=None):
+            if(pn=="pp"): tz=-1
+            if(pn=="nn"): tz=1
+            if(pn=="pn"): tz=0
+        else: tz=None
+
+        zero = op.get_0bme()
+        one = 0.0
         for i, j, in itertools.product(list(range(1,norbs+1)), repeat=2):
-            me1 = self.get_1btd(i,j)
-            me2 = op.get_1btd(i,j)
-            if(abs(me1) < 1.e-8): continue
-            x.append(me1)
-            y.append(me2)
-        ax.plot(x,y,ms=4,marker="o",c="r",mfc="orange",ls="",label="one-body")
-        if(len(x)>0):
-            vmin = min(x+y)
-            vmax = max(x+y)
-        else:
-            vmin = 1e100
-            vmax =-1e100
+            oi = orbits_op.get_orbit(i)
+            i_d = orbits_de.get_orbit_index(oi.n, oi.l, oi.j, oi.z)
+            oj = orbits_op.get_orbit(j)
+            j_d = orbits_de.get_orbit_index(oj.n, oj.l, oj.j, oj.z)
 
-        x, y = [], []
-        for channels in self.two.keys():
-            for idxs in self.two[channels].keys():
-                me1 = self.two[channels][idxs]
-                me2 = op.get_2btd_from_mat_indices(*channels,*idxs)
-                if(abs(me1) < 1.e-8): continue
-                x.append(me1)
-                y.append(me2)
-        ax.plot(x,y,ms=4,marker="s",c="b",mfc="skyblue",ls="",label="two-body")
-        vmin = min(x+y+[vmin,])
-        vmax = max(x+y+[vmax,])
-        ax.plot([vmin,vmax],[vmin,vmax],ls=":",lw=0.8,label="y=x",c="k")
+            HF_i = self.Rho_r.Get_orbit_index_HF(oi.n, oi.l, oi.j, oi.z)
+            HF_j = self.Rho_r.Get_orbit_index_HF(oj.n, oj.l, oj.j, oj.z)
+            if( tz!=None and oi.z!=tz and oj.z!=tz ): continue
+            if( J1!=None and oi.j!=J1 and oj.j!=J1 ): continue
+            if( abs(oi.z-oj.z) != 2*op.rankZ): continue
+            if((-1)**(oi.l+oj.l) * op.rankP != 1): continue
+            if( self._triag( oi.j, oj.j, 2*op.rankJ )): continue
+            reducedME = 0
+            if( op.rankJ==0 and op.rankP==1 and op.rankZ==0 and (not op.reduced) ):
+                reducedME = op.get_1bme(i,j) * self.get_1btd(i_d,j_d,op.rankJ) * np.sqrt(oj.j+1) / np.sqrt(2*self.Jbra+1)
+                one += reducedME 
+            else:
+                #print( "{:3d}{:3d}{:10.6f}{:10.6f}{:10.6f}".format(i_d,j_d,\
+                #        op.get_1bme(i,j), self.get_1btd(i_d,j_d,op.rankJ), op.get_1bme(i,j) * self.get_1btd(i_d,j_d,op.rankJ) ))
+                reducedME = op.get_1bme(i,j) * self.get_1btd(i_d,j_d,op.rankJ)
+                one += reducedME
+            self.Rho_r.AddToRho_1b(HF_i, HF_j, reducedME)
 
-    def get_sp_entropy(self, i, m2, Mbra, Mket):
-        if(self.Jbra != self.Jket): raise "bra and ket wave functions need to be the same"
-        if(self.wflabel_bra != self.wflabel_ket): raise "bra and ket wave functions need to be the same"
-        oi = self.ms.orbits.get_orbit(i)
-        nprob = self.get_1btd_Mscheme(i, m2, i, m2, Mbra, Mket)
-        if(nprob<1.e-16): nprob=1.e-16
-        if(nprob>1.0): nprob=1-1.e-16
-        s = - nprob * np.log(nprob) - (1-nprob) * np.log((1-nprob))
-        return s
+        two = 0.0
+        ijlist = list(itertools.combinations_with_replacement(list(range(1,norbs+1)),2))
+        for ij, kl in itertools.product(ijlist, repeat=2):
+            i, j = ij
+            k, l = kl
+            oi = orbits_op.get_orbit(i)
+            oj = orbits_op.get_orbit(j)
+            ok = orbits_op.get_orbit(k)
+            ol = orbits_op.get_orbit(l)
 
-    def get_sp_entropy_from_orbit(self, oi, m2, Mbra, Mket):
-        return self.get_sp_entropy(self.ms.orbits.get_orbit_index_from_orbit(oi), m2, Mbra, Mket)
+            i_d = orbits_de.get_orbit_index(oi.n, oi.l, oi.j, oi.z)
+            j_d = orbits_de.get_orbit_index(oj.n, oj.l, oj.j, oj.z)
+            k_d = orbits_de.get_orbit_index(ok.n, ok.l, ok.j, ok.z)
+            l_d = orbits_de.get_orbit_index(ol.n, ol.l, ol.j, ol.z)
 
-    def get_sp_entropy_from_qns(self, n, l, j, z, m2, Mbra, Mket):
-        return self.get_sp_entropy(self.ms.orbits.get_orbit_index_from_tuple((n, l, j, z)), m2, Mbra, Mket)
+            HF_i = self.Rho_r.Get_orbit_index_HF(oi.n, oi.l, oi.j, oi.z)
+            HF_j = self.Rho_r.Get_orbit_index_HF(oj.n, oj.l, oj.j, oj.z)
+            HF_k = self.Rho_r.Get_orbit_index_HF(ok.n, ok.l, ok.j, ok.z)
+            HF_l = self.Rho_r.Get_orbit_index_HF(ol.n, ol.l, ol.j, ol.z)
 
-    def get_2b_Mscheme_entropy(self, i1, m1, i2, m2, Mbra, Mket):
-        orbits = self.ms.orbits
-        o1 = orbits.get_orbit(i1)
-        o2 = orbits.get_orbit(i2)
-        return self.get_2b_Mscheme_entropy_from_qns(o1.n, o1.l, o1.j, o1.z, m1, o2.n, o2.l, o2.j, o2.z, m2, Mbra, Mket)
+            if((-1)**(oi.l+oj.l+ok.l+ol.l) * op.rankP != 1): continue
+            if( abs(oi.z+oj.z-ok.z-ol.z) != 2*op.rankZ): continue
+            if( tz!=None and (oi.z+oj.z)//2!=tz and (ok.z+ol.z)//2!=tz ): continue
 
-    def get_2b_Mscheme_entropy_from_qns(self, n1, l1, j1, z1, m1, n2, l2, j2, z2, m2, Mbra, Mket):
-        if(self.Jbra != self.Jket): raise "bra and ket wave functions need to be the same"
-        if(self.wflabel_bra != self.wflabel_ket): raise "bra and ket wave functions need to be the same"
-        orbits = self.ms.orbits
-        i1 = orbits.get_orbit_index(n1, l1, j1, z1)
-        i2 = orbits.get_orbit_index(n2, l2, j2, z2)
-        o1 = orbits.get_orbit(i1)
-        o2 = orbits.get_orbit(i2)
-        rho = np.zeros((4,4))
-        tbtd = self.get_2btd_Mscheme(i1, m1, i2, m2, i1, m1, i2, m2, Mbra, Mket)
-        rho[0,0] = 1 - self.get_1btd_Mscheme(i1,m1,i1,m1,Mbra,Mket) - self.get_1btd_Mscheme(i2,m2,i2,m2,Mbra,Mket) + tbtd
-        rho[1,1] = self.get_1btd_Mscheme(i2,m2,i2,m2,Mbra,Mket) - tbtd
-        rho[2,2] = self.get_1btd_Mscheme(i1,m1,i1,m1,Mbra,Mket) - tbtd
-        rho[3,3] = tbtd
-        rho[1,2] = self.get_1btd_Mscheme(i1,m1,i2,m2,Mbra,Mket)
-        rho[2,1] = self.get_1btd_Mscheme(i2,m2,i1,m1,Mbra,Mket)
-        e_val, e_vec = np.linalg.eigh(rho)
-        s = 0
-        for e in e_val:
-            if(e<1.e-16): e=1.e-16
-            if(e>1.0): e=1-1.e-16
-            s -= e * np.log(e)
-        return s
+            Jijlist = list(range( int(abs(oi.j-oj.j)/2), int((oi.j+oj.j)/2)+1))
+            Jkllist = list(range( int(abs(ok.j-ol.j)/2), int((ok.j+ol.j)/2)+1))
+            for Jij, Jkl in itertools.product(Jijlist, Jkllist):
+                if(i == j and Jij%2 == 1): continue
+                if(k == l and Jkl%2 == 1): continue
+                if( self._triag( Jij, Jkl, op.rankJ )): continue
+                if( J2!=None and Jij!=J2 and Jkl!=J2 ): continue
+                reducedME = 0
+                if(op.rankJ==0 and op.rankP==1 and op.rankZ==0 and (not op.reduced)):
+                    reducedME = op.get_2bme_from_indices(i,j,k,l,Jij,Jkl) * self.get_2btd_from_indices(i_d,j_d,k_d,l_d,Jij,Jkl,op.rankJ) * \
+                                 np.sqrt(2*Jij+1)/np.sqrt(2*self.Jbra+1)
+                    two += reducedME
 
-    def get_2b_Mscheme_mutual_info_from_qns(self, n1, l1, j1, z1, m1, n2, l2, j2, z2, m2, Mbra, Mket):
-        if(self.Jbra != self.Jket): raise "bra and ket wave functions need to be the same"
-        if(self.wflabel_bra != self.wflabel_ket): raise "bra and ket wave functions need to be the same"
-        if(n1==n2 and l1==l2 and j1==j2 and z1==z2 and m1==m2): return 0
-        return self.get_sp_entropy_from_qns(n1, l1, j1, z1, m1, Mbra, Mket) + \
-                self.get_sp_entropy_from_qns(n2, l2, j2, z2, m2, Mbra, Mket) - \
-                self.get_2b_Mscheme_entropy_from_qns(n1, l1, j1, z1, m1, n2, l2, j2, z2, m2, Mbra, Mket)
-
-    def get_2b_Mscheme_mutual_info(self, i1, m1, i2, m2, Mbra, Mket):
-        if(self.Jbra != self.Jket): raise "bra and ket wave functions need to be the same"
-        if(self.wflabel_bra != self.wflabel_ket): raise "bra and ket wave functions need to be the same"
-        if(i1==i2 and m1==m2): return 0
-        return self.get_sp_entropy(i1, m1, Mbra, Mket) + \
-                self.get_sp_entropy(i2, m2, Mbra, Mket) - \
-                self.get_2b_Mscheme_entropy(i1, m1, i2, m2, Mbra, Mket)
-
+                    #print("{:3d},{:3d},{:3d},{:3d},{:3d},{:3d},{:3d},{:12.6f}".format(i_d,j_d,k_d,l_d,Jij,Jkl,op.rankJ,self.get_2btd_from_indices(i_d,j_d,k_d,l_d,Jij,Jkl,op.rankJ)))
+                    #print("{:3d},{:3d},{:3d},{:3d},{:3d},{:3d},{:12.6f}".format(i,j,k,l,Jij,Jkl,op.get_2bme_from_indices(i,j,k,l,Jij,Jkl)))
+                else:
+                    reducedME = op.get_2bme_from_indices(i,j,k,l,Jij,Jkl) * self.get_2btd_from_indices(i_d,j_d,k_d,l_d,Jij,Jkl,op.rankJ)
+                    two += reducedME
+                    #print("{:3d},{:3d},{:3d},{:3d},{:3d},{:3d},{:3d},{:12.6f}".format(i_d,j_d,k_d,l_d,Jij,Jkl,op.rankJ,self.get_2btd_from_indices(i_d,j_d,k_d,l_d,Jij,Jkl,op.rankJ)))
+                    #print("{:3d},{:3d},{:3d},{:3d},{:3d},{:3d},{:12.6f}".format(i,j,k,l,Jij,Jkl,op.get_2bme_from_indices(i,j,k,l,Jij,Jkl)))
+                    #if(abs(op.get_2bme_from_indices(i,j,k,l,Jij,Jkl) * self.get_2btd_from_indices(i_d,j_d,k_d,l_d,Jij,Jkl,op.rankJ))>1.e-16):
+                    #    print("{:3d},{:3d},{:3d},{:3d},{:3d},{:3d},{:16.10f},{:16.10f}".format(i,j,k,l,Jij,Jkl,op.get_2bme_from_indices(i,j,k,l,Jij,Jkl),\
+                    #        self.get_2btd_from_indices(i_d,j_d,k_d,l_d,Jij,Jkl,op.rankJ)))
+                self.Rho_r.AddToRho_2b(HF_i, HF_j, HF_k, HF_l, reducedME)
+        return zero,one,two
 
 def main():
     file_td="transition-density-file-name"
